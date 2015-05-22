@@ -28,6 +28,8 @@ import argparse
 import multiprocessing
 from distutils.spawn import find_executable
 
+def OnCygwin():
+  return "CYGWIN" in platform.system()
 
 def OnMac():
   return platform.system() == 'Darwin'
@@ -110,13 +112,21 @@ def ParseArguments():
 
 def GetCmakeArgs( parsed_args ):
   cmake_args = []
+
+
   if parsed_args.clang_completer:
     cmake_args.append( '-DUSE_CLANG_COMPLETER=ON' )
 
-  if parsed_args.system_libclang:
+  if OnCygwin():
+    print( 'Detected Cygwin. Overriding passed arguments and using system libclang' )
+    cmake_args.append( '-DEXTERNAL_LIBCLANG_PATH=/usr/lib/libclang.dll.a' )
+  elif parsed_args.system_libclang:
     cmake_args.append( '-DUSE_SYSTEM_LIBCLANG=ON' )
 
   if parsed_args.system_boost:
+    cmake_args.append( '-DUSE_SYSTEM_BOOST=ON' )
+  if OnCygwin() and '64bit' in platform.architecture():
+    print( 'Detected 64-bit Cygwin. Overriding passed arguments and using system boost' )
     cmake_args.append( '-DUSE_SYSTEM_BOOST=ON' )
 
   extra_cmake_args = os.environ.get( 'EXTRA_CMAKE_ARGS', '' )
@@ -187,7 +197,7 @@ def Main():
   CheckDeps()
   args = ParseArguments()
   BuildYcmdLibs( GetCmakeArgs( args ) )
-  if args.omnisharp_completer:
+  if args.omnisharp_completer and not OnCygwin():
     BuildOmniSharp()
   if args.gocode_completer:
     BuildGoCode()
